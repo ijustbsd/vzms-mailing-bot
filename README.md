@@ -1,1 +1,1 @@
-# tg-to-email-bot
+# vzms-mailing-bot
