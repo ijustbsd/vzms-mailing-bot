@@ -1,0 +1,47 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.0.1
+    hooks:
+      - id: check-docstring-first
+        stages:
+          - commit
+          - push
+      - id: check-merge-conflict
+        stages:
+          - push
+      - id: trailing-whitespace
+        stages:
+          - commit
+          - push
+      - id: end-of-file-fixer
+        stages:
+          - commit
+          - push
+      - id: mixed-line-ending
+        stages:
+          - commit
+          - push
+  - repo: https://github.com/asottile/add-trailing-comma
+    rev: v2.1.0
+    hooks:
+      - id: add-trailing-comma
+        stages:
+          - commit
+          - push
+  - repo: https://gitlab.com/pycqa/flake8
+    rev: 3.9.2
+    hooks:
+      - id: flake8
+        stages:
+          - commit
+          - push
+        args:
+          - --max-line-length=120
+  - repo: https://github.com/psf/black
+    rev: 21.7b0
+    hooks:
+      - id: black
+        stages:
+          - commit
+          - push
+        language_version: python3.9
