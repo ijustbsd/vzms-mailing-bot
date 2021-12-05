@@ -51,3 +51,34 @@ async def test_send_mail():
         await send_email(message=message)
 
         assert len(mock.requests) == 1
+
+
+@pytest.mark.parametrize(
+    "hashtag,to_field",
+    [
+        ("#рассылка", "test_email_to"),
+        ("#рассылка_всем", "test_email_to_all"),
+        ("#рассылка #рассылка_всем", "test_email_to_all"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_send_mail_to(hashtag, to_field):
+    def callback(url, **kwargs):
+        request_data = kwargs["data"]
+        data_fields = {field[0]["name"]: field[2] for field in request_data._fields}
+
+        assert data_fields["to"] == to_field
+
+        return CallbackResult(status=200)
+
+    with aioresponses() as mock:
+        mock.post(
+            "https://api.mailgun.net/v3/test_email_domain/messages",
+            callback=callback,
+        )
+
+        message = AsyncMock(html_text=f"Бла-бла-бла\n{hashtag}", document=None)
+
+        await send_email(message=message)
+
+        assert len(mock.requests) == 1
