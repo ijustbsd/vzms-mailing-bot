@@ -24,8 +24,8 @@ async def send_email(message: types.Message):
 
     # удаляем хештег и переносы строк в конце сообщения
     email_text = (
-        message.html_text.replace(f"#{settings.TG_HASTAG}", "")
-        .replace(f"#{settings.TG_HASTAG_ALL}", "")
+        message.html_text.replace(f"#{settings.TG_HASTAG_ALL}", "")
+        .replace(f"#{settings.TG_HASTAG}", "")
         .rstrip("\n")
     )
 
