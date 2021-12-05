@@ -17,13 +17,22 @@ with Path(__file__).parent.joinpath("templates/message.html").open() as f:
 
 
 async def send_email(message: types.Message):
+    if settings.TG_HASTAG_ALL in message.html_text:
+        email_to = settings.EMAIL_TO_ALL
+    else:
+        email_to = settings.EMAIL_TO
+
     # удаляем хештег и переносы строк в конце сообщения
-    email_text = message.html_text.replace(f"#{settings.TG_HASTAG}", "").rstrip("\n")
+    email_text = (
+        message.html_text.replace(f"#{settings.TG_HASTAG}", "")
+        .replace(f"#{settings.TG_HASTAG_ALL}", "")
+        .rstrip("\n")
+    )
 
     async with aiohttp.ClientSession() as session:
         data = aiohttp.FormData()
         data.add_field("from", settings.EMAIL_FROM)
-        data.add_field("to", settings.EMAIL_TO)
+        data.add_field("to", email_to)
         data.add_field("subject", settings.EMAIL_SUBJECT)
         data.add_field(
             "html",
@@ -54,7 +63,7 @@ def create_bot() -> Dispatcher:
     dp = Dispatcher(bot)
     dp.register_message_handler(
         send_email,
-        hashtags=[settings.TG_HASTAG],
+        hashtags=[settings.TG_HASTAG, settings.TG_HASTAG_ALL],
         chat_id=settings.TG_CHAT_ID,
         content_types=[types.ContentType.TEXT, types.ContentType.DOCUMENT],
     )
