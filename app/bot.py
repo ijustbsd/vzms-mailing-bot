@@ -61,7 +61,7 @@ async def send_email(message: types.Message):
 def create_bot() -> Dispatcher:
     bot = Bot(token=settings.TG_BOT_TOKEN, parse_mode=types.ParseMode.HTML)
     dp = Dispatcher(bot)
-    dp.register_message_handler(
+    dp.register_channel_post_handler(
         send_email,
         hashtags=[settings.TG_HASTAG, settings.TG_HASTAG_ALL],
         chat_id=settings.TG_CHAT_ID,
