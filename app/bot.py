@@ -1,6 +1,7 @@
 import asyncio
 import io
 import logging
+import datetime as dt
 from pathlib import Path
 
 import aiohttp
@@ -15,12 +16,100 @@ logger = logging.getLogger(__name__)
 with Path(__file__).parent.joinpath("templates/message.html").open() as f:
     email_template = f.read()
 
+bot = Bot(token=settings.TG_BOT_TOKEN, parse_mode=types.ParseMode.HTML)
+
+
+async def create_campaign(html: str, emails_list_id: int) -> int:
+    async with aiohttp.ClientSession() as session:
+        resp = await session.post(
+            url="https://api.dashamail.com/",
+            params={
+                "api_key": settings.DASHAMAIL_API_KEY,
+                "method": "campaigns.create",
+            },
+            json={
+                "list_id": [emails_list_id],
+                "subject": settings.EMAIL_SUBJECT,
+                "from_email": settings.EMAIL_FROM,
+                "from_name": settings.NAME_FROM,
+                "html": email_template.replace("%message%", html).replace("\n", "<br>"),
+            },
+        )
+
+        if resp.status != 200:
+            raise RuntimeError
+
+        response = await resp.json()
+        logger.info("campaigns.create response: %s", response)
+
+        err_code = response["response"]["msg"]["err_code"]
+        if err_code:
+            raise RuntimeError
+
+        return response["response"]["data"]["campaign_id"]
+
+
+async def attach_file_to_campaign(
+    campaign_id: int, file_url: str, file_name: str
+) -> None:
+    async with aiohttp.ClientSession() as session:
+        resp = await session.post(
+            url="https://api.dashamail.com/",
+            params={
+                "api_key": settings.DASHAMAIL_API_KEY,
+                "method": "campaigns.attach",
+                "campaign_id": campaign_id,
+                "url": file_url,
+                "name": file_name,
+            },
+        )
+
+        if resp.status != 200:
+            raise RuntimeError
+
+        response = await resp.json()
+        logger.info("campaigns.attach response: %s", response)
+
+        err_code = response["response"]["msg"]["err_code"]
+        if err_code:
+            raise RuntimeError
+
+
+async def schedule_campaign(campaign_id: int):
+    async with aiohttp.ClientSession() as session:
+        resp = await session.post(
+            url="https://api.dashamail.com/",
+            params={
+                "api_key": settings.DASHAMAIL_API_KEY,
+                "method": "campaigns.update",
+                "campaign_id": campaign_id,
+            },
+            json={
+                "status": "SCHEDULE",
+                "delivery_time": (dt.datetime.now() + dt.timedelta(minutes=1)).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
+            },
+        )
+
+        if resp.status != 200:
+            raise RuntimeError
+
+        response = await resp.json()
+        logger.info("campaigns.update response: %s", response)
+
+        err_code = response["response"]["msg"]["err_code"]
+        if err_code:
+            raise RuntimeError
+
 
 async def send_email(message: types.Message):
+    logger.info("handle message: %s", message.message_id)
+
     if settings.TG_HASTAG_ALL in message.html_text:
-        email_to = settings.EMAIL_TO_ALL
+        emails_list_id = settings.DASHAMAIL_LIST_ALL_ID
     else:
-        email_to = settings.EMAIL_TO
+        emails_list_id = settings.DASHAMAIL_LIST_ID
 
     # удаляем хештег и переносы строк в конце сообщения
     email_text = (
@@ -29,37 +118,19 @@ async def send_email(message: types.Message):
         .rstrip("\n")
     )
 
-    async with aiohttp.ClientSession() as session:
-        data = aiohttp.FormData()
-        data.add_field("from", settings.EMAIL_FROM)
-        data.add_field("to", email_to)
-        data.add_field("subject", settings.EMAIL_SUBJECT)
-        data.add_field(
-            "html",
-            email_template.replace("%message%", email_text).replace("\n", "<br>"),
+    campaign_id = await create_campaign(email_text, emails_list_id)
+    if message.document is not None:
+        file = await bot.get_file(file_id=message.document.file_id)
+        file_url = bot.get_file_url(file_path=file.file_path)
+        await attach_file_to_campaign(
+            campaign_id=campaign_id,
+            file_url=file_url,
+            file_name=message.document.file_name,
         )
-        if message.document is not None:
-            data.add_field(
-                "attachment",
-                await message.document.download(destination_file=io.BytesIO()),
-                filename=message.document.file_name,
-            )
-        params = {
-            "auth": aiohttp.BasicAuth("api", settings.MAILGUN_API_KEY),
-            "data": data,
-        }
-        for _ in range(5):
-            resp = await session.post(
-                f"https://api.mailgun.net/v3/{settings.EMAIL_DOMAIN}/messages", **params
-            )
-            if resp.status == 200:
-                break
-            logger.warning("Mailgun response status: %s", resp.status)
-            await asyncio.sleep(3)
+    await schedule_campaign(campaign_id)
 
 
 def create_bot() -> Dispatcher:
-    bot = Bot(token=settings.TG_BOT_TOKEN, parse_mode=types.ParseMode.HTML)
     dp = Dispatcher(bot)
     dp.register_channel_post_handler(
         send_email,

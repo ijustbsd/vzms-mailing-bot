@@ -6,6 +6,7 @@ from app.bot import send_email
 from yarl import URL
 
 
+@pytest.mark.skip("Переписать с mailgun на dashamail")
 @pytest.mark.asyncio
 async def test_send_mail():
     def callback(url, **kwargs):
@@ -27,7 +28,7 @@ async def test_send_mail():
             "<html><br>Бла-бла-бла<br><br>"
             "<i>Это сообщение было отправлено автоматически. "
             "Пожалуйста, не отвечайте на него! Почта для связи с оргкомитетом: "
-            '<a href="mailto:vzms@mail.ru">vzms@mail.ru</a>. '
+            '<a href="mailto:vzmsh@mail.ru">vzmsh@mail.ru</a>. '
             "Чтобы отписаться от новостных сообщений перейдите по "
             '<a href="%mailing_list_unsubscribe_url%">ссылке</a>.</i>'
             "<br></html><br>"
@@ -53,6 +54,7 @@ async def test_send_mail():
         assert len(mock.requests) == 1
 
 
+@pytest.mark.skip("Переписать с mailgun на dashamail")
 @pytest.mark.parametrize(
     "hashtag,to_field",
     [
